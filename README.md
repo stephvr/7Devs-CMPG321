@@ -1,4 +1,4 @@
-# 7Devs CMPG321 Project
+# Uber/Bolt Operations Analysis
 
 Oracle database environment for the CMPG321 Phase 2 project.
 
