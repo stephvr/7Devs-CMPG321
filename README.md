@@ -2,7 +2,7 @@
 
 Oracle database environment for the CMPG321 Phase 2 project.
 
-**Steps below assumes that Docker is used. Docker is recommended but not required, so if you don't plan on using Docker, don't follow these steps exactly.**
+**Steps below assumes that Docker is used. Docker is recommended but not required, so if you plan on not using Docker, don't follow these steps exactly.**
 ## Requirements
 
 Recommended:
