@@ -1,0 +1,13 @@
+services:
+  oracle:
+    image: gvenzl/oracle-free
+    container_name: cmpg321-oracle
+    ports:
+      - "1522:1521"
+    environment:
+      ORACLE_PASSWORD: cmpg321
+    volumes:
+      - oracle_data:/opt/oracle/oradata
+
+volumes:
+  oracle_data:
