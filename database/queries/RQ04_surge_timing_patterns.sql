@@ -1,11 +1,11 @@
-/* ============================================================
+/*
    RQ4 - SURGE TIMING AND MULTIPLIER PATTERNS
-   ============================================================ */
+ */
 
 
-/* ============================================================
+/* 
    QUERY 1: Surge patterns by hour of day
-   ============================================================ */
+ */
 
 SELECT
     EXTRACT(HOUR FROM h.request_timestamp) AS trip_hour,
@@ -48,9 +48,9 @@ GROUP BY EXTRACT(HOUR FROM h.request_timestamp)
 ORDER BY trip_hour;
 
 
-/* ============================================================
+/* 
    QUERY 2: Surge multiplier by city and operating period
-   ============================================================ */
+*/
 
 WITH surge_periods AS (
     SELECT
