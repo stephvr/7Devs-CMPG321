@@ -1,13 +1,33 @@
-PROMPT ========================================
-PROMPT CMPG321 DATABASE SETUP
-PROMPT ========================================
 
-PROMPT Creating tables...
-@01_create_tables.sql
 
-PROMPT Adding constraints...
-@02_constraints.sql
+BEGIN
+    FOR t IN (
+        SELECT 'TRIP_REVIEWS' table_name FROM dual UNION ALL
+        SELECT 'TRIP_FARE_BREAKDOWN' FROM dual UNION ALL
+        SELECT 'TRIP_HEADERS' FROM dual UNION ALL
+        SELECT 'VEHICLES' FROM dual UNION ALL
+        SELECT 'PRICING_SURGE_ZONES' FROM dual UNION ALL
+        SELECT 'SA_RIDERS' FROM dual UNION ALL
+        SELECT 'SA_DRIVERS' FROM dual UNION ALL
+        SELECT 'PLATFORM_AFFILIATION' FROM dual UNION ALL
+        SELECT 'CITIES' FROM dual UNION ALL
+        SELECT 'PROVINCES' FROM dual UNION ALL
 
-PROMPT ========================================
-PROMPT DATABASE SETUP COMPLETE
-PROMPT ========================================
+        SELECT 'STG_PRICING_SURGE_ZONES' FROM dual UNION ALL
+        SELECT 'STG_SA_RIDERS' FROM dual UNION ALL
+        SELECT 'STG_SA_DRIVERS' FROM dual
+    )
+    LOOP
+        BEGIN
+            EXECUTE IMMEDIATE
+                'DROP TABLE ' || t.table_name ||
+                ' CASCADE CONSTRAINTS PURGE';
+        EXCEPTION
+            WHEN OTHERS THEN
+                IF SQLCODE != -942 THEN
+                    RAISE;
+                END IF;
+        END;
+    END LOOP;
+END;
+/
