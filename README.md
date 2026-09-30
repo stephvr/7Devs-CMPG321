@@ -1,235 +1,209 @@
-# Uber/Bolt Operations Analysis
+# Uber & Bolt Operations Analysis
 
-Oracle database environment for the CMPG321 Phase 2 project.
+CMPG321 Phase 2 database project analysing driver earnings, platform commission, surge pricing and operational patterns across selected South African cities.
 
-**Steps below assumes that Docker is used. Docker is recommended but not required, so if you plan on not using Docker, don't follow these steps exactly.**
-## Requirements
+## Project Focus
 
-Recommended:
+The database supports analysis of driver earnings, platform commission, surge pricing, trip completion and cancellation patterns, rider and driver activity, vehicle information, and trip-level fare and review data.
 
-- Docker Desktop
-- Oracle SQL Developer
-- Git
+## Database
 
-## 1. Clone the repository
+The project uses **Oracle Database** running in Docker and is accessed through **Oracle SQL Developer**.
 
-```bash
-git clone https://github.com/stephvr/7Devs-CMPG321.git
-cd 7Devs-CMPG321
-```
+| Setting | Value |
+|---|---|
+| Username | `CMPG321` |
+| Password | `cmpg321` |
+| Host | `localhost` |
+| Port | `1522` |
+| Service name | `FREEPDB1` |
 
-## 2. Start Oracle with Docker
-
-```bash
-docker compose up -d
-```
-
-Check that the container is running:
-
-```bash
-docker ps
-```
-
-Container name:
+## Repository Structure
 
 ```text
-cmpg321-oracle
+database/
+├── data/
+│   └── original project CSV files
+├── schema/
+│   ├── 00_setup.sql
+│   ├── 01_create_tables.sql
+│   └── 02_constraints.sql
+├── load/
+│   ├── 00_create_staging_tables.sql
+│   ├── 01_reference_data.sql
+│   └── 02_transform_staging.sql
+└── queries/
+    ├── RQ01_...
+    ├── RQ02_...
+    ├── RQ03_driver_commission_rate.sql
+    ├── RQ04_surge_timing_patterns.sql
+    └── ...
 ```
 
-## 3. SQL Developer connection
+## Final 3NF Schema
 
-Connect to the Oracle container using:
+The implemented database contains **10 final tables**:
+
+1. `PROVINCES`
+2. `CITIES`
+3. `PLATFORM_AFFILIATION`
+4. `SA_DRIVERS`
+5. `SA_RIDERS`
+6. `VEHICLES`
+7. `PRICING_SURGE_ZONES`
+8. `TRIP_HEADERS`
+9. `TRIP_FARE_BREAKDOWN`
+10. `TRIP_REVIEWS`
+
+The original source data contains repeated geographic and platform information. These values are normalized into lookup tables.
 
 ```text
-Host: localhost
-Port: 1522
-Service Name: FREEPDB1
-Username: system
-Password: cmpg321
+CITIES → PROVINCES
+SA_DRIVERS → CITIES
+SA_DRIVERS → PLATFORM_AFFILIATION
+SA_RIDERS → CITIES
+PRICING_SURGE_ZONES → CITIES
 ```
 
-## 4. Create the project user
+## Rebuilding the Database
 
-Run the following while connected as `SYSTEM`:
+Run these scripts in SQL Developer using **Run Script (F5)**:
+
+```text
+1. database/schema/00_setup.sql
+2. database/schema/01_create_tables.sql
+3. database/schema/02_constraints.sql
+4. database/load/00_create_staging_tables.sql
+5. database/load/01_reference_data.sql
+```
+
+## Importing Source Data
+
+These three source files must first be imported into staging tables:
+
+| Source file | Import into |
+|---|---|
+| `sa_drivers.csv` | `STG_SA_DRIVERS` |
+| `sa_riders.csv` | `STG_SA_RIDERS` |
+| `pricing_surge_zones.csv` | `STG_PRICING_SURGE_ZONES` |
+
+Import **all columns** from each CSV.
+
+Expected staging row counts:
+
+```text
+STG_SA_DRIVERS             800
+STG_SA_RIDERS             1200
+STG_PRICING_SURGE_ZONES      9
+```
+
+Then run:
+
+```text
+database/load/02_transform_staging.sql
+```
+
+Expected normalized row counts:
+
+```text
+SA_DRIVERS             800
+SA_RIDERS             1200
+PRICING_SURGE_ZONES      9
+```
+
+## Remaining Direct Imports
+
+| Source file | Final table | Expected rows |
+|---|---|---:|
+| `vehicles.csv` | `VEHICLES` | 800 |
+| `trip_headers_clean.csv` | `TRIP_HEADERS` | 50,000 |
+| `trip_fare_breakdown.csv` | `TRIP_FARE_BREAKDOWN` | 50,000 |
+| `trip_reviews.csv` | `TRIP_REVIEWS` | 25,055 |
+
+Use `trip_headers_clean.csv` rather than the original trip header file so completed trips have a proper `NULL` cancellation reason.
+
+For `request_timestamp`, use the timestamp format matching the CSV values during SQL Developer import.
+
+## Main Relationships
+
+```text
+PROVINCES 1 ─── 0..* CITIES
+
+CITIES 1 ─── 0..* SA_DRIVERS
+CITIES 1 ─── 0..* SA_RIDERS
+CITIES 1 ─── 0..* PRICING_SURGE_ZONES
+
+PLATFORM_AFFILIATION 1 ─── 0..* SA_DRIVERS
+
+SA_DRIVERS 1 ─── 0..1 VEHICLES
+SA_DRIVERS 1 ─── 0..* TRIP_HEADERS
+
+SA_RIDERS 1 ─── 0..* TRIP_HEADERS
+
+PRICING_SURGE_ZONES 1 ─── 0..* TRIP_HEADERS
+
+TRIP_HEADERS 1 ─── 1 TRIP_FARE_BREAKDOWN
+TRIP_HEADERS 1 ─── 0..1 TRIP_REVIEWS
+```
+
+## Research Queries
+
+Research-question SQL files are stored under:
+
+```text
+database/queries/
+```
+
+### RQ03 — Driver Earnings and Platform Commission
+
+`RQ03_driver_commission_rate.sql`
+
+Analyses total fare value, nominal and effective commission rates, platform commission, driver payout and driver retention by platform affiliation.
+
+### RQ04 — Surge Timing Patterns
+
+`RQ04_surge_timing_patterns.sql`
+
+Analyses surge occurrence by hour and operating period, with comparison across cities.
+
+## Validation
 
 ```sql
-CREATE USER cmpg321 IDENTIFIED BY cmpg321;
-
-GRANT CREATE SESSION TO cmpg321;
-GRANT CREATE TABLE TO cmpg321;
-GRANT CREATE VIEW TO cmpg321;
-GRANT CREATE SEQUENCE TO cmpg321;
-GRANT CREATE PROCEDURE TO cmpg321;
-GRANT CREATE TRIGGER TO cmpg321;
-
-ALTER USER cmpg321 QUOTA UNLIMITED ON USERS;
+SELECT COUNT(*) FROM SA_DRIVERS;
+SELECT COUNT(*) FROM SA_RIDERS;
+SELECT COUNT(*) FROM VEHICLES;
+SELECT COUNT(*) FROM PRICING_SURGE_ZONES;
+SELECT COUNT(*) FROM TRIP_HEADERS;
+SELECT COUNT(*) FROM TRIP_FARE_BREAKDOWN;
+SELECT COUNT(*) FROM TRIP_REVIEWS;
 ```
 
-Then create a second SQL Developer connection:
+Expected:
 
 ```text
-Connection Name: CMPG321 Project
-Username: cmpg321
-Password: cmpg321
-Host: localhost
-Port: 1522
-Service Name: FREEPDB1
+SA_DRIVERS                800
+SA_RIDERS                1200
+VEHICLES                  800
+PRICING_SURGE_ZONES         9
+TRIP_HEADERS            50000
+TRIP_FARE_BREAKDOWN     50000
+TRIP_REVIEWS            25055
 ```
 
-Use this connection for the project tables and queries rather than `SYSTEM`.
+## Docker
 
-## 5. Create the database schema
+Start Oracle:
 
-Open:
-
-```text
-database/schema/00_setup.sql
-```
-
-Run it using **Run Script (F5)** in Oracle SQL Developer.
-
-The setup script executes:
-
-```text
-01_create_tables.sql
-02_constraints.sql
-```
-
-The schema contains the following seven tables:
-
-- `SA_DRIVERS`
-- `SA_RIDERS`
-- `PRICING_SURGE_ZONES`
-- `VEHICLES`
-- `TRIP_HEADERS`
-- `TRIP_FARE_BREAKDOWN`
-- `TRIP_REVIEWS`
-
-## 6. Load the data
-
-Import the CSV files from:
-
-```text
-database/data/
-```
-
-Load the tables in this order so that foreign-key dependencies are satisfied:
-
-1. `SA_DRIVERS`
-2. `SA_RIDERS`
-3. `PRICING_SURGE_ZONES`
-4. `VEHICLES`
-5. `TRIP_HEADERS`
-6. `TRIP_FARE_BREAKDOWN`
-7. `TRIP_REVIEWS`
-
-### Import notes
-
-For `SA_DRIVERS.onboarding_date` and `SA_RIDERS.account_created_date`, use:
-
-```text
-YYYY/MM/DD
-```
-
-For `TRIP_HEADERS.request_timestamp`, use:
-
-```text
-YYYY-MM-DD HH24:MI:SS
-```
-
-For completed trips, `cancellation_reason` should be imported as `NULL`. The cleaned trip-header CSV should therefore be used if the original file contains `N/A` for completed trips.
-
-## 7. Verify the imported data
-
-Run:
-
-```sql
-SELECT 'SA_DRIVERS' AS table_name, COUNT(*) AS row_count FROM SA_DRIVERS
-UNION ALL
-SELECT 'SA_RIDERS', COUNT(*) FROM SA_RIDERS
-UNION ALL
-SELECT 'PRICING_SURGE_ZONES', COUNT(*) FROM PRICING_SURGE_ZONES
-UNION ALL
-SELECT 'VEHICLES', COUNT(*) FROM VEHICLES
-UNION ALL
-SELECT 'TRIP_HEADERS', COUNT(*) FROM TRIP_HEADERS
-UNION ALL
-SELECT 'TRIP_FARE_BREAKDOWN', COUNT(*) FROM TRIP_FARE_BREAKDOWN
-UNION ALL
-SELECT 'TRIP_REVIEWS', COUNT(*) FROM TRIP_REVIEWS;
-```
-
-Expected row counts:
-
-| Table | Rows |
-|---|---:|
-| `SA_DRIVERS` | 800 |
-| `SA_RIDERS` | 1200 |
-| `PRICING_SURGE_ZONES` | 9 |
-| `VEHICLES` | 800 |
-| `TRIP_HEADERS` | 50000 |
-| `TRIP_FARE_BREAKDOWN` | 50000 |
-| `TRIP_REVIEWS` | 25055 |
-
-## 8. Stop or restart the database
-
-Stop Oracle:
-
-```bash
-docker compose stop
-```
-
-Start it again:
-
-```bash
+```powershell
 docker compose start
 ```
 
-Stop and remove the container while preserving the named database volume:
+Stop Oracle:
 
-```bash
-docker compose down
+```powershell
+docker compose stop
 ```
 
-Do **not** use `docker compose down -v` unless you intentionally want to delete the stored Oracle database data.
+The Oracle data remains in the Docker named volume when the container is stopped.
 
-## Project structure
-
-```text
-7Devs-CMPG321/
-├── database/
-│   ├── data/
-│   │   ├── sa_drivers.csv
-│   │   ├── sa_riders.csv
-│   │   ├── pricing_surge_zones.csv
-│   │   ├── vehicles.csv
-│   │   ├── trip_headers_clean.csv
-│   │   ├── trip_fare_breakdown.csv
-│   │   └── trip_reviews.csv
-│   ├── schema/
-│   │   ├── 00_setup.sql
-│   │   ├── 01_create_tables.sql
-│   │   └── 02_constraints.sql
-│   └── queries/
-├── docker-compose.yml
-├── .gitignore
-└── README.md
-```
-
-## Team workflow
-
-Before starting work:
-
-```bash
-git pull
-```
-
-After making changes:
-
-```bash
-git add .
-git commit -m "Describe the change"
-git push
-```
-
-Database schema changes should be committed as SQL files so that every team member can reproduce the same database structure.
+Avoid `docker compose down -v` unless the database volume should intentionally be deleted.
