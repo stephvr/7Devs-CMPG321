@@ -1,6 +1,20 @@
--- =========================================
--- PRIMARY KEYS
--- =========================================
+
+
+/*
+   PRIMARY KEYS
+*/
+
+ALTER TABLE PROVINCES
+ADD CONSTRAINT pk_provinces
+PRIMARY KEY (province_id);
+
+ALTER TABLE CITIES
+ADD CONSTRAINT pk_cities
+PRIMARY KEY (city_id);
+
+ALTER TABLE PLATFORM_AFFILIATION
+ADD CONSTRAINT pk_platform_affiliation
+PRIMARY KEY (affiliation_id);
 
 ALTER TABLE SA_DRIVERS
 ADD CONSTRAINT pk_sa_drivers
@@ -11,7 +25,7 @@ ADD CONSTRAINT pk_sa_riders
 PRIMARY KEY (rider_id);
 
 ALTER TABLE PRICING_SURGE_ZONES
-ADD CONSTRAINT pk_pricing_zones
+ADD CONSTRAINT pk_pricing_surge_zones
 PRIMARY KEY (zone_id);
 
 ALTER TABLE VEHICLES
@@ -23,7 +37,7 @@ ADD CONSTRAINT pk_trip_headers
 PRIMARY KEY (trip_id);
 
 ALTER TABLE TRIP_FARE_BREAKDOWN
-ADD CONSTRAINT pk_trip_fare
+ADD CONSTRAINT pk_trip_fare_breakdown
 PRIMARY KEY (trip_id);
 
 ALTER TABLE TRIP_REVIEWS
@@ -31,9 +45,34 @@ ADD CONSTRAINT pk_trip_reviews
 PRIMARY KEY (review_id);
 
 
--- =========================================
--- FOREIGN KEYS
--- =========================================
+/*
+   FOREIGN KEYS
+*/
+
+ALTER TABLE CITIES
+ADD CONSTRAINT fk_cities_province
+FOREIGN KEY (province_id)
+REFERENCES PROVINCES(province_id);
+
+ALTER TABLE SA_DRIVERS
+ADD CONSTRAINT fk_driver_affiliation
+FOREIGN KEY (affiliation_id)
+REFERENCES PLATFORM_AFFILIATION(affiliation_id);
+
+ALTER TABLE SA_DRIVERS
+ADD CONSTRAINT fk_driver_city
+FOREIGN KEY (city_id)
+REFERENCES CITIES(city_id);
+
+ALTER TABLE SA_RIDERS
+ADD CONSTRAINT fk_rider_city
+FOREIGN KEY (city_id)
+REFERENCES CITIES(city_id);
+
+ALTER TABLE PRICING_SURGE_ZONES
+ADD CONSTRAINT fk_zone_city
+FOREIGN KEY (city_id)
+REFERENCES CITIES(city_id);
 
 ALTER TABLE VEHICLES
 ADD CONSTRAINT fk_vehicle_driver
@@ -41,14 +80,14 @@ FOREIGN KEY (driver_id)
 REFERENCES SA_DRIVERS(driver_id);
 
 ALTER TABLE TRIP_HEADERS
-ADD CONSTRAINT fk_trip_rider
-FOREIGN KEY (rider_id)
-REFERENCES SA_RIDERS(rider_id);
-
-ALTER TABLE TRIP_HEADERS
 ADD CONSTRAINT fk_trip_driver
 FOREIGN KEY (driver_id)
 REFERENCES SA_DRIVERS(driver_id);
+
+ALTER TABLE TRIP_HEADERS
+ADD CONSTRAINT fk_trip_rider
+FOREIGN KEY (rider_id)
+REFERENCES SA_RIDERS(rider_id);
 
 ALTER TABLE TRIP_HEADERS
 ADD CONSTRAINT fk_trip_zone
@@ -66,9 +105,25 @@ FOREIGN KEY (trip_id)
 REFERENCES TRIP_HEADERS(trip_id);
 
 
--- =========================================
--- UNIQUE CONSTRAINTS
--- =========================================
+/*
+   UNIQUE CONSTRAINTS
+*/
+
+ALTER TABLE PROVINCES
+ADD CONSTRAINT uq_province_name
+UNIQUE (province_name);
+
+ALTER TABLE CITIES
+ADD CONSTRAINT uq_city_name
+UNIQUE (city_name);
+
+ALTER TABLE PLATFORM_AFFILIATION
+ADD CONSTRAINT uq_affiliation_name
+UNIQUE (affiliation_name);
+
+ALTER TABLE VEHICLES
+ADD CONSTRAINT uq_vehicle_driver
+UNIQUE (driver_id);
 
 ALTER TABLE VEHICLES
 ADD CONSTRAINT uq_license_plate
@@ -78,36 +133,19 @@ ALTER TABLE TRIP_REVIEWS
 ADD CONSTRAINT uq_review_trip
 UNIQUE (trip_id);
 
-ALTER TABLE VEHICLES
-ADD CONSTRAINT uq_vehicle_driver
-UNIQUE (driver_id);
 
+/*
+   CHECK CONSTRAINTS
+*/
 
--- =========================================
--- SA_DRIVERS CHECK CONSTRAINTS
--- =========================================
-
-ALTER TABLE SA_DRIVERS
-ADD CONSTRAINT chk_platform_affiliation
+ALTER TABLE PLATFORM_AFFILIATION
+ADD CONSTRAINT chk_affiliation_commission
 CHECK (
-    platform_affiliation IN (
-        'Uber',
-        'Bolt',
-        'Dual-Platform (Both)'
-    )
-);
-
-ALTER TABLE SA_DRIVERS
-ADD CONSTRAINT chk_commission_rate
-CHECK (
-    (platform_affiliation = 'Uber'
-        AND platform_commission_pct = 0.25)
+    (affiliation_name = 'Uber' AND commission_pct = 0.25)
     OR
-    (platform_affiliation = 'Bolt'
-        AND platform_commission_pct = 0.20)
+    (affiliation_name = 'Bolt' AND commission_pct = 0.20)
     OR
-    (platform_affiliation = 'Dual-Platform (Both)'
-        AND platform_commission_pct = 0.22)
+    (affiliation_name = 'Dual-Platform (Both)' AND commission_pct = 0.22)
 );
 
 ALTER TABLE SA_DRIVERS
@@ -118,27 +156,17 @@ ALTER TABLE SA_DRIVERS
 ADD CONSTRAINT chk_lifetime_trips
 CHECK (total_lifetime_trips >= 0);
 
-
--- =========================================
--- PRICING_SURGE_ZONES CHECK CONSTRAINTS
--- =========================================
-
 ALTER TABLE PRICING_SURGE_ZONES
 ADD CONSTRAINT chk_zone_base_fare
 CHECK (base_fare_zar > 0);
 
 ALTER TABLE PRICING_SURGE_ZONES
-ADD CONSTRAINT chk_zone_km_rate
+ADD CONSTRAINT chk_zone_per_km
 CHECK (per_km_rate_zar > 0);
 
 ALTER TABLE PRICING_SURGE_ZONES
-ADD CONSTRAINT chk_zone_min_rate
+ADD CONSTRAINT chk_zone_per_min
 CHECK (per_min_rate_zar > 0);
-
-
--- =========================================
--- TRIP_HEADERS CHECK CONSTRAINTS
--- =========================================
 
 ALTER TABLE TRIP_HEADERS
 ADD CONSTRAINT chk_ride_category
@@ -162,30 +190,29 @@ CHECK (
 );
 
 ALTER TABLE TRIP_HEADERS
-ADD CONSTRAINT chk_cancellation
+ADD CONSTRAINT chk_cancellation_reason
 CHECK (
-    (trip_status = 'COMPLETED'
-        AND cancellation_reason IS NULL)
-    OR
-    (trip_status IN (
-        'CANCELLED_BY_RIDER',
-        'CANCELLED_BY_DRIVER'
-    )
-        AND cancellation_reason IN (
-            'DRIVER_TOO_FAR',
-            'TRAFFIC_DELAY',
-            'CHANGED_MIND',
-            'SAFETY_CONCERN',
-            'PRICING_SURGE',
-            'RIDER_NO_SHOW'
-        )
+    cancellation_reason IS NULL
+    OR cancellation_reason IN (
+        'CHANGED_MIND',
+        'DRIVER_TOO_FAR',
+        'PRICING_SURGE',
+        'RIDER_NO_SHOW',
+        'SAFETY_CONCERN',
+        'TRAFFIC_DELAY'
     )
 );
 
-
--- =========================================
--- TRIP_FARE_BREAKDOWN CHECK CONSTRAINTS
--- =========================================
+ALTER TABLE TRIP_HEADERS
+ADD CONSTRAINT chk_status_cancellation
+CHECK (
+    (trip_status = 'COMPLETED' AND cancellation_reason IS NULL)
+    OR
+    (
+        trip_status IN ('CANCELLED_BY_RIDER', 'CANCELLED_BY_DRIVER')
+        AND cancellation_reason IS NOT NULL
+    )
+);
 
 ALTER TABLE TRIP_FARE_BREAKDOWN
 ADD CONSTRAINT chk_distance
@@ -200,7 +227,7 @@ ADD CONSTRAINT chk_surge
 CHECK (surge_multiplier >= 1);
 
 ALTER TABLE TRIP_FARE_BREAKDOWN
-ADD CONSTRAINT chk_base_fare
+ADD CONSTRAINT chk_fare_base
 CHECK (base_fare_zar >= 0);
 
 ALTER TABLE TRIP_FARE_BREAKDOWN
@@ -216,7 +243,7 @@ ADD CONSTRAINT chk_total_fare
 CHECK (total_fare_zar >= 0);
 
 ALTER TABLE TRIP_FARE_BREAKDOWN
-ADD CONSTRAINT chk_platform_comm
+ADD CONSTRAINT chk_platform_commission
 CHECK (platform_commission_zar >= 0);
 
 ALTER TABLE TRIP_FARE_BREAKDOWN
@@ -235,15 +262,22 @@ CHECK (
     )
 );
 
-
--- =========================================
--- TRIP_REVIEWS CHECK CONSTRAINTS
--- =========================================
+ALTER TABLE SA_RIDERS
+ADD CONSTRAINT chk_preferred_payment
+CHECK (
+    preferred_payment IN (
+        'CREDIT_CARD',
+        'DEBIT_CARD',
+        'IN_APP_WALLET',
+        'CASH',
+        'EFT_OZOW'
+    )
+);
 
 ALTER TABLE TRIP_REVIEWS
-ADD CONSTRAINT chk_rider_rating
+ADD CONSTRAINT chk_rider_rating_driver
 CHECK (rider_rating_of_driver BETWEEN 1 AND 5);
 
 ALTER TABLE TRIP_REVIEWS
-ADD CONSTRAINT chk_driver_review_rating
+ADD CONSTRAINT chk_driver_rating_rider
 CHECK (driver_rating_of_rider BETWEEN 1 AND 5);
